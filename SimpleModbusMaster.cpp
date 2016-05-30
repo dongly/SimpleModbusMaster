@@ -14,17 +14,17 @@ unsigned char state;
 unsigned char retry_count;
 unsigned char TxEnablePin;
 
-// frame[] is used to receive and transmit packages. 
+// frame[] is used to receive and transmit packages.
 // The maximum number of bytes in a modbus packet is 256 bytes
 // This is limited to the serial buffer of 64 bytes
-unsigned char frame[BUFFER_SIZE]; 
+unsigned char frame[BUFFER_SIZE];
 unsigned char buffer;
 long timeout; // timeout interval
 long polling; // turnaround delay interval
 unsigned int T1_5; // inter character time out in microseconds
 unsigned int frameDelay; // frame time out in microseconds
 long delayStart; // init variable for turnaround and timeout delay
-unsigned int total_no_of_packets; 
+unsigned int total_no_of_packets;
 Packet* packetArray; // packet starting address
 Packet* packet; // current packet
 unsigned int* register_array; // pointer to masters register array
@@ -47,7 +47,7 @@ unsigned int calculateCRC(unsigned char bufferSize);
 void sendPacket(unsigned char bufferSize);
 
 // Modbus Master State Machine
-void modbus_update() 
+void modbus_update()
 {
 	switch (state)
 	{
@@ -65,79 +65,87 @@ void modbus_update()
 
 void idle()
 {
-  static unsigned int packet_index;	
-	
+  static unsigned int packet_index;
+
 	unsigned int failed_connections = 0;
-	
+
 	unsigned char current_connection;
-	
+
 	do
-	{		
+	{
 		if (packet_index == total_no_of_packets) // wrap around to the beginning
 			packet_index = 0;
-				
+
 		// proceed to the next packet
 		packet = &packetArray[packet_index];
-		
+
 		// get the current connection status
 		current_connection = packet->connection;
-		
+
 		if (!current_connection)
-		{			
+		{
 			// If all the connection attributes are false return
 			// immediately to the main sketch
 			if (++failed_connections == total_no_of_packets)
 				return;
 		}
-		packet_index++;     
-    
-	// if a packet has no connection get the next one		
-	}while (!current_connection); 
-		
+		packet_index++;
+
+	// if a packet has no connection get the next one
+	}while (!current_connection);
+
 	constructPacket();
 }
-  
+
 void constructPacket()
-{	 
+{
   packet->requests++;
   frame[0] = packet->id;
   frame[1] = packet->function;
   frame[2] = packet->address >> 8; // address Hi
   frame[3] = packet->address & 0xFF; // address Lo
-	
+
 	// For functions 1 & 2 data is the number of points
 	// For function 5 data is either ON (0xFF00) or OFF (0x0000)
 	// For function 6 data is exactly that, one register's data
   // For functions 3, 4 & 16 data is the number of registers
   // For function 15 data is the number of coils
-	
+
 	// The data attribute needs to be intercepted by F5 & F6 because these requests
 	// include their data in the data register and not in the masters array
-	if (packet->function == FORCE_SINGLE_COIL || packet->function == PRESET_SINGLE_REGISTER) 
+	if (packet->function == FORCE_SINGLE_COIL ){
+		uint16_t regAddr= packet->local_start_address / 16;
+		uint8_t bitAddr =packet->local_start_address % 16 ;
+		if (bitAddr>0){
+			regAddr ++;
+		}
+		packet->data = (bitRead(register_array[regAddr],bitAddr)?COIL_ON:COIL_OFF);
+	}
+	if ( packet->function == PRESET_SINGLE_REGISTER)
 		packet->data = register_array[packet->local_start_address]; // get the data
-	
-	
+
+
 	frame[4] = packet->data >> 8; // MSB
 	frame[5] = packet->data & 0xFF; // LSB
-	
-	unsigned char frameSize;    
-	
-  // construct the frame according to the modbus function  
-  if (packet->function == PRESET_MULTIPLE_REGISTERS) 
+
+	unsigned char frameSize;
+
+  // construct the frame according to the modbus function
+  if (packet->function == PRESET_MULTIPLE_REGISTERS)
 		frameSize = construct_F16();
 	else if (packet->function == FORCE_MULTIPLE_COILS)
 		frameSize = construct_F15();
 	else // else functions 1,2,3,4,5 & 6 is assumed. They all share the exact same request format.
     frameSize = 8; // the request is always 8 bytes in size for the above mentioned functions.
-		
-	unsigned int crc16 = calculateCRC(frameSize - 2);	
+
+	unsigned int crc16 = calculateCRC(frameSize - 2);
   frame[frameSize - 2] = crc16 >> 8; // split crc into 2 bytes
   frame[frameSize - 1] = crc16 & 0xFF;
   sendPacket(frameSize);
 
 	state = WAITING_FOR_REPLY; // state change
-	
-	// if broadcast is requested (id == 0) for function 5,6,15 and 16 then override 
+
+	// if broadcast is requested (id == 0) for function 5,6,15 and 16 then override
   // the previous state and force a success since the slave wont respond
 	if (packet->id == 0)
 			processSuccess();
@@ -148,26 +156,26 @@ unsigned char construct_F15()
 	// function 15 coil information is packed LSB first until the first 16 bits are completed
   // It is received the same way..
   unsigned char no_of_registers = packet->data / 16;
-  unsigned char no_of_bytes = no_of_registers * 2; 
-	
-  // if the number of points dont fit in even 2byte amounts (one register) then use another register and pad 
-  if (packet->data % 16 > 0) 
+  unsigned char no_of_bytes = no_of_registers * 2;
+
+  // if the number of points dont fit in even 2byte amounts (one register) then use another register and pad
+  if (packet->data % 16 > 0)
   {
     no_of_registers++;
     no_of_bytes++;
   }
-	
+
   frame[6] = no_of_bytes;
   unsigned char bytes_processed = 0;
   unsigned char index = 7; // user data starts at index 7
 	unsigned int temp;
-	
+
   for (unsigned char i = 0; i < no_of_registers; i++)
   {
     temp = register_array[packet->local_start_address + i]; // get the data
-    frame[index] = temp & 0xFF; 
+    frame[index] = temp & 0xFF;
     bytes_processed++;
-     
+
     if (bytes_processed < no_of_bytes)
     {
       frame[index + 1] = temp >> 8;
@@ -175,20 +183,20 @@ unsigned char construct_F15()
       index += 2;
     }
   }
-	unsigned char frameSize = (9 + no_of_bytes); // first 7 bytes of the array + 2 bytes CRC + noOfBytes 
+	unsigned char frameSize = (9 + no_of_bytes); // first 7 bytes of the array + 2 bytes CRC + noOfBytes
 	return frameSize;
 }
 
 unsigned char construct_F16()
 {
-	unsigned char no_of_bytes = packet->data * 2; 
-    
-  // first 6 bytes of the array + no_of_bytes + 2 bytes CRC 
+	unsigned char no_of_bytes = packet->data * 2;
+
+  // first 6 bytes of the array + no_of_bytes + 2 bytes CRC
   frame[6] = no_of_bytes; // number of bytes
   unsigned char index = 7; // user data starts at index 7
 	unsigned char no_of_registers = packet->data;
 	unsigned int temp;
-		
+
   for (unsigned char i = 0; i < no_of_registers; i++)
   {
     temp = register_array[packet->local_start_address + i]; // get the data
@@ -197,7 +205,7 @@ unsigned char construct_F16()
     frame[index] = temp & 0xFF;
     index++;
   }
-	unsigned char frameSize = (9 + no_of_bytes); // first 7 bytes of the array + 2 bytes CRC + noOfBytes 
+	unsigned char frameSize = (9 + no_of_bytes); // first 7 bytes of the array + 2 bytes CRC + noOfBytes
 	return frameSize;
 }
 
@@ -216,18 +224,18 @@ void waiting_for_reply()
 		buffer = 0;
 		while ((*ModbusPort).available())
 		{
-			// The maximum number of bytes is limited to the serial buffer size 
-      // of BUFFER_SIZE. If more bytes is received than the BUFFER_SIZE the 
+			// The maximum number of bytes is limited to the serial buffer size
+      // of BUFFER_SIZE. If more bytes is received than the BUFFER_SIZE the
       // overflow flag will be set and the serial buffer will be read until
-      // all the data is cleared from the receive buffer, while the slave is 
+      // all the data is cleared from the receive buffer, while the slave is
       // still responding.
-			if (overflowFlag) 
+			if (overflowFlag)
 				(*ModbusPort).read();
 			else
 			{
 				if (buffer == BUFFER_SIZE)
 					overflowFlag = 1;
-			
+
 				frame[buffer] = (*ModbusPort).read();
 				buffer++;
 			}
@@ -238,19 +246,19 @@ void waiting_for_reply()
 			// be received and thus will force a frame_error.
 			delayMicroseconds(T1_5); // inter character time out
 		}
-			
+
 		// The minimum buffer size from a slave can be an exception response of
     // 5 bytes. If the buffer was partially filled set a frame_error.
 		// The maximum number of bytes in a modbus packet is 256 bytes.
 		// The serial buffer limits this to 64 bytes.
-	
+
 		if ((buffer < 5) || overflowFlag)
-			processError();       
-      
-		// Modbus over serial line datasheet states that if an unexpected slave 
+			processError();
+
+		// Modbus over serial line datasheet states that if an unexpected slave
     // responded the master must do nothing and continue with the time out.
 		// This seems silly cause if an incorrect slave responded you would want to
-    // have a quick turnaround and poll the right one again. If an unexpected 
+    // have a quick turnaround and poll the right one again. If an unexpected
     // slave responded it will most likely be a frame error in any event
 		else if (frame[0] != packet->id) // check id returned
 			processError();
@@ -267,13 +275,13 @@ void waiting_for_reply()
 void processReply()
 {
 	// combine the crc Low & High bytes
-  unsigned int received_crc = ((frame[buffer - 2] << 8) | frame[buffer - 1]); 
+  unsigned int received_crc = ((frame[buffer - 2] << 8) | frame[buffer - 1]);
   unsigned int calculated_crc = calculateCRC(buffer - 2);
-	
+
 	if (calculated_crc == received_crc) // verify checksum
 	{
-		// To indicate an exception response a slave will 'OR' 
-		// the requested function with 0x80 
+		// To indicate an exception response a slave will 'OR'
+		// the requested function with 0x80
 		if ((frame[1] & 0x80) == 0x80) // extract 0x80
 		{
 			packet->exception_errors++;
@@ -302,7 +310,7 @@ void processReply()
         break;
       }
 		}
-	} 
+	}
 	else // checksum failed
 	{
 		processError();
@@ -313,23 +321,23 @@ void process_F1_F2()
 {
 	// packet->data for function 1 & 2 is actually the number of boolean points
   unsigned char no_of_registers = packet->data / 16;
-  unsigned char number_of_bytes = no_of_registers * 2; 
-       
-  // if the number of points dont fit in even 2byte amounts (one register) then use another register and pad 
-  if (packet->data % 16 > 0) 
+  unsigned char number_of_bytes = no_of_registers * 2;
+
+  // if the number of points dont fit in even 2byte amounts (one register) then use another register and pad
+  if (packet->data % 16 > 0)
   {
     no_of_registers++;
     number_of_bytes++;
   }
-             
+
   if (frame[2] == number_of_bytes) // check number of bytes returned
-  { 
+  {
     unsigned char bytes_processed = 0;
-    unsigned char index = 3; // start at the 4th element in the frame and combine the Lo byte  
+    unsigned char index = 3; // start at the 4th element in the frame and combine the Lo byte
     unsigned int temp;
     for (unsigned char i = 0; i < no_of_registers; i++)
     {
-      temp = frame[index]; 
+      temp = frame[index];
       bytes_processed++;
       if (bytes_processed < number_of_bytes)
       {
@@ -339,9 +347,9 @@ void process_F1_F2()
       }
       register_array[packet->local_start_address + i] = temp;
     }
-    processSuccess(); 
+    processSuccess();
   }
-  else // incorrect number of bytes returned 
+  else // incorrect number of bytes returned
     processError();
 }
 
@@ -349,19 +357,19 @@ void process_F3_F4()
 {
 	// check number of bytes returned - unsigned int == 2 bytes
   // data for function 3 & 4 is the number of registers
-  if (frame[2] == (packet->data * 2)) 
+  if (frame[2] == (packet->data * 2))
   {
     unsigned char index = 3;
     for (unsigned char i = 0; i < packet->data; i++)
     {
-      // start at the 4th element in the frame and combine the Lo byte 
-      register_array[packet->local_start_address + i] = (frame[index] << 8) | frame[index + 1]; 
+      // start at the 4th element in the frame and combine the Lo byte
+      register_array[packet->local_start_address + i] = (frame[index] << 8) | frame[index + 1];
       index += 2;
     }
-    processSuccess(); 
+    processSuccess();
   }
-  else // incorrect number of bytes returned  
-    processError();  
+  else // incorrect number of bytes returned
+    processError();
 }
 
 void process_F5_F6_F15_F16()
@@ -369,7 +377,7 @@ void process_F5_F6_F15_F16()
 	// The repsonse of functions 5,6,15 & 16 are just an echo of the query
   unsigned int recieved_address = ((frame[2] << 8) | frame[3]);
   unsigned int recieved_data = ((frame[4] << 8) | frame[5]);
-		
+
   if ((recieved_address == packet->address) && (recieved_data == packet->data))
     processSuccess();
   else
@@ -380,8 +388,8 @@ void processError()
 {
 	packet->retries++;
 	packet->failed_requests++;
-	
-	// if the number of retries have reached the max number of retries 
+
+	// if the number of retries have reached the max number of retries
   // allowable, stop requesting the specific packet
   if (packet->retries == retry_count)
 	{
@@ -399,19 +407,19 @@ void processSuccess()
 	state = WAITING_FOR_TURNAROUND;
 	delayStart = millis(); // start the turnaround delay
 }
-  
+
 void modbus_configure(HardwareSerial* SerialPort,
 											long baud,
 											unsigned char byteFormat,
-											long _timeout, 
-											long _polling, 
-											unsigned char _retry_count, 
-											unsigned char _TxEnablePin, 
-											Packet* _packets, 
+											long _timeout,
+											long _polling,
+											unsigned char _retry_count,
+											unsigned char _TxEnablePin,
+											Packet* _packets,
 											unsigned int _total_no_of_packets,
 											unsigned int* _register_array)
-{ 
-	// Modbus states that a baud rate higher than 19200 must use a fixed 750 us 
+{
+	// Modbus states that a baud rate higher than 19200 must use a fixed 750 us
   // for inter character time out and 1.75 ms for a frame delay for baud rates
   // below 19200 the timing is more critical and has to be calculated.
   // E.g. 9600 baud in a 11 bit packet is 9600/11 = 872 characters per second
@@ -421,21 +429,21 @@ void modbus_configure(HardwareSerial* SerialPort,
   // 1.5T = 1.14583ms * 1.5 = 1.71875ms. A frame delay is 3.5T.
 	// Thus the formula is T1.5(us) = (1000ms * 1000(us) * 1.5 * 11bits)/baud
 	// 1000ms * 1000(us) * 1.5 * 11bits = 16500000 can be calculated as a constant
-	
+
 	if (baud > 19200)
-		T1_5 = 750; 
-	else 
+		T1_5 = 750;
+	else
 		T1_5 = 16500000/baud; // 1T * 1.5 = T1.5
-		
+
 	/* The modbus definition of a frame delay is a waiting period of 3.5 character times
 		 between packets. This is not quite the same as the frameDelay implemented in
 		 this library but does benifit from it.
-		 The frameDelay variable is mainly used to ensure that the last character is 
+		 The frameDelay variable is mainly used to ensure that the last character is
 		 transmitted without truncation. A value of 2 character times is chosen which
 		 should suffice without holding the bus line high for too long.*/
-		 
-	frameDelay = T1_5 * 2; 
-	
+
+	frameDelay = T1_5 * 2;
+
 	// initialize
 	state = IDLE;
   timeout = _timeout;
@@ -445,19 +453,19 @@ void modbus_configure(HardwareSerial* SerialPort,
 	total_no_of_packets = _total_no_of_packets;
 	packetArray = _packets;
 	register_array = _register_array;
-	
+
 	ModbusPort = SerialPort;
 	(*ModbusPort).begin(baud, byteFormat);
-	
+
 	pinMode(TxEnablePin, OUTPUT);
   digitalWrite(TxEnablePin, LOW);
-	
-} 
 
-void modbus_construct(Packet *_packet, 
-											unsigned char id, 
-											unsigned char function, 
-											unsigned int address, 
+}
+
+void modbus_construct(Packet *_packet,
+											unsigned char id,
+											unsigned char function,
+											unsigned int address,
 											unsigned int data,
 											unsigned int local_start_address)
 {
@@ -469,7 +477,7 @@ void modbus_construct(Packet *_packet,
 	_packet->connection = 1;
 }
 
-unsigned int calculateCRC(unsigned char bufferSize) 
+unsigned int calculateCRC(unsigned char bufferSize)
 {
   unsigned int temp, temp2, flag;
   temp = 0xFFFF;
@@ -484,27 +492,27 @@ unsigned int calculateCRC(unsigned char bufferSize)
         temp ^= 0xA001;
     }
   }
-  // Reverse byte order. 
+  // Reverse byte order.
   temp2 = temp >> 8;
   temp = (temp << 8) | temp2;
   temp &= 0xFFFF;
   // the returned value is already swapped
   // crcLo byte is first & crcHi byte is last
-  return temp; 
+  return temp;
 }
 
 void sendPacket(unsigned char bufferSize)
 {
 	digitalWrite(TxEnablePin, HIGH);
-		
+
 	for (unsigned char i = 0; i < bufferSize; i++)
 		(*ModbusPort).write(frame[i]);
-		
+
 	(*ModbusPort).flush();
-	
+
 	delayMicroseconds(frameDelay);
-	
+
 	digitalWrite(TxEnablePin, LOW);
-		
-	delayStart = millis(); // start the timeout delay	
+
+	delayStart = millis(); // start the timeout delay
 }
