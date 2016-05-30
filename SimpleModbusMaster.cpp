@@ -19,8 +19,8 @@ unsigned char TxEnablePin;
 // This is limited to the serial buffer of 64 bytes
 unsigned char frame[BUFFER_SIZE];
 unsigned char buffer;
-long timeout; // timeout interval
-long polling; // turnaround delay interval
+unsigned long timeout; // timeout interval
+unsigned long polling; // turnaround delay interval
 unsigned int T1_5; // inter character time out in microseconds
 unsigned int frameDelay; // frame time out in microseconds
 long delayStart; // init variable for turnaround and timeout delay
@@ -156,15 +156,17 @@ unsigned char construct_F15()
 	// function 15 coil information is packed LSB first until the first 16 bits are completed
   // It is received the same way..
   unsigned char no_of_registers = packet->data / 16;
-  unsigned char no_of_bytes = no_of_registers * 2;
+  unsigned char no_of_bytes = packet->data / 8;
 
   // if the number of points dont fit in even 2byte amounts (one register) then use another register and pad
   if (packet->data % 16 > 0)
   {
     no_of_registers++;
-    no_of_bytes++;
   }
-
+	if((packet->data % 8 > 0))
+	{
+		no_of_bytes ++;
+	}
   frame[6] = no_of_bytes;
   unsigned char bytes_processed = 0;
   unsigned char index = 7; // user data starts at index 7
@@ -322,15 +324,18 @@ void process_F1_F2()
 	// packet->data for function 1 & 2 is actually the number of boolean points
   unsigned char no_of_registers = packet->data / 16;
   unsigned char number_of_bytes = no_of_registers * 2;
-
+	unsigned int RegisterAddress = (packet->local_start_address /16);
+	unsigned char RegisterStartBit = packet->local_start_address % 16;
   // if the number of points dont fit in even 2byte amounts (one register) then use another register and pad
   if (packet->data % 16 > 0)
   {
     no_of_registers++;
-    number_of_bytes++;
   }
-
-  if (frame[2] == number_of_bytes) // check number of bytes returned
+	if (packet->data % 8 >0)
+	{
+		number_of_bytes++;
+	}
+	if (frame[2] == number_of_bytes) // check number of bytes returned
   {
     unsigned char bytes_processed = 0;
     unsigned char index = 3; // start at the 4th element in the frame and combine the Lo byte
@@ -339,13 +344,23 @@ void process_F1_F2()
     {
       temp = frame[index];
       bytes_processed++;
-      if (bytes_processed < number_of_bytes)
+      if (bytes_processed +2 < number_of_bytes)
       {
 				temp = (frame[index + 1] << 8) | temp;
         bytes_processed++;
         index += 2;
       }
-      register_array[packet->local_start_address + i] = temp;
+			if (RegisterStartBit > 0)
+			{
+      	register_array[RegisterAddress+i] = (register_array[RegisterAddress+i] & ((1U<<RegisterStartBit)-1)) \
+																						| (temp << RegisterStartBit);
+				register_array[RegisterAddress+i+1] = (register_array[RegisterAddress+i+1] & ~((1U<<RegisterStartBit)-1)) \
+																						| (temp >> RegisterStartBit);
+			}
+			else
+			{
+				register_array[RegisterAddress+i] = temp;
+			}
     }
     processSuccess();
   }
@@ -411,8 +426,8 @@ void processSuccess()
 void modbus_configure(HardwareSerial* SerialPort,
 											long baud,
 											unsigned char byteFormat,
-											long _timeout,
-											long _polling,
+											unsigned long _timeout,
+											unsigned long _polling,
 											unsigned char _retry_count,
 											unsigned char _TxEnablePin,
 											Packet* _packets,
