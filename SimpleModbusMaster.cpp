@@ -25,10 +25,15 @@ unsigned int T1_5; // inter character time out in microseconds
 unsigned int frameDelay; // frame time out in microseconds
 long delayStart; // init variable for turnaround and timeout delay
 unsigned int total_no_of_packets;
+unsigned int temp_total_no_of_packets;
 Packet* packetArray; // packet starting address
+Packet* tempPacketArray;
 Packet* packet; // current packet
 unsigned int* register_array; // pointer to masters register array
 HardwareSerial* ModbusPort;
+unsigned char PacketsChanged;
+unsigned int packet_index;
+bool isFinished;
 
 // function definitions
 void idle();
@@ -45,6 +50,7 @@ void processError();
 void processSuccess();
 unsigned int calculateCRC(unsigned char bufferSize);
 void sendPacket(unsigned char bufferSize);
+void updatePackets(void);
 
 // Modbus Master State Machine
 void modbus_update()
@@ -52,6 +58,9 @@ void modbus_update()
 	switch (state)
 	{
 		case IDLE:
+		if(PacketsChanged){
+			updatePackets();
+		}
 		idle();
 		break;
 		case WAITING_FOR_REPLY:
@@ -65,17 +74,23 @@ void modbus_update()
 
 void idle()
 {
-  static unsigned int packet_index;
-
 	unsigned int failed_connections = 0;
 
 	unsigned char current_connection;
-
+	unsigned char i;
 	do
 	{
-		if (packet_index == total_no_of_packets) // wrap around to the beginning
+		if (packet_index >= total_no_of_packets) // wrap around to the beginning
+		{
 			packet_index = 0;
-
+			isFinished =true;
+			return;
+		}
+		if (packet_index == 0){
+			for(i=0;i<total_no_of_packets;i++){
+				packetArray[i].connection = 1;
+			}
+		}
 		// proceed to the next packet
 		packet = &packetArray[packet_index];
 
@@ -287,6 +302,7 @@ void processReply()
 		if ((frame[1] & 0x80) == 0x80) // extract 0x80
 		{
 			packet->exception_errors++;
+			packet->exceptionCode = frame[1];
 			processError();
 		}
 		else
@@ -395,8 +411,10 @@ void process_F5_F6_F15_F16()
 
   if ((recieved_address == packet->address) && (recieved_data == packet->data))
     processSuccess();
-  else
+  else{
+		packet->exceptionCode = 0x04;
     processError();
+}
 }
 
 void processError()
@@ -468,6 +486,7 @@ void modbus_configure(HardwareSerial* SerialPort,
 	total_no_of_packets = _total_no_of_packets;
 	packetArray = _packets;
 	register_array = _register_array;
+	isFinished =false;
 
 	ModbusPort = SerialPort;
 	(*ModbusPort).begin(baud, byteFormat);
@@ -530,4 +549,30 @@ void sendPacket(unsigned char bufferSize)
 	digitalWrite(TxEnablePin, LOW);
 
 	delayStart = millis(); // start the timeout delay
+}
+
+unsigned char modbus_getstate(void)
+{
+	return state;
+}
+
+void modbus_updatePackets(Packet* _packets,unsigned int _total_no_of_packets)
+{
+	temp_total_no_of_packets = _total_no_of_packets;
+	tempPacketArray = _packets;
+	PacketsChanged = 1;
+}
+
+void updatePackets(void)
+{
+	packetArray = tempPacketArray;
+	total_no_of_packets = temp_total_no_of_packets;
+	packet_index = 0;
+	PacketsChanged = 0;
+	isFinished =false;
+}
+
+bool modbus_isFinished(void )
+{
+	return isFinished;
 }

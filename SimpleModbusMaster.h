@@ -115,9 +115,9 @@ typedef struct
 	unsigned int failed_requests;
 	unsigned int exception_errors;
   unsigned int retries;
-
   // connection status of packet
   unsigned char connection;
+  unsigned char exceptionCode;
 
 }Packet;
 
@@ -142,4 +142,8 @@ void modbus_configure(HardwareSerial* SerialPort,
 											unsigned int _total_no_of_packets,
 											unsigned int* _register_array);
 
+unsigned char modbus_getstate(void);
+
+void modbus_updatePackets(Packet* _packets,unsigned int _total_no_of_packets);
+bool modbus_isFinished(void );
 #endif
