@@ -38,6 +38,7 @@ bool isFinished;
 // function definitions
 void idle();
 void constructPacket();
+void construct_F5(void);
 unsigned char construct_F15();
 unsigned char construct_F16();
 void waiting_for_reply();
@@ -51,7 +52,6 @@ void processSuccess();
 unsigned int calculateCRC(unsigned char bufferSize);
 void sendPacket(unsigned char bufferSize);
 void updatePackets(void);
-
 // Modbus Master State Machine
 void modbus_update()
 {
@@ -129,16 +129,10 @@ void constructPacket()
 	// The data attribute needs to be intercepted by F5 & F6 because these requests
 	// include their data in the data register and not in the masters array
 	if (packet->function == FORCE_SINGLE_COIL ){
-		uint16_t regAddr= packet->local_start_address / 16;
-		uint8_t bitAddr =packet->local_start_address % 16 ;
-		if (bitAddr>0){
-			regAddr ++;
-		}
-		packet->data = (bitRead(register_array[regAddr],bitAddr)?COIL_ON:COIL_OFF);
-	}
-	if ( packet->function == PRESET_SINGLE_REGISTER)
+		construct_F5();
+	}else	if ( packet->function == PRESET_SINGLE_REGISTER){
 		packet->data = register_array[packet->local_start_address]; // get the data
-
+	}
 
 	frame[4] = packet->data >> 8; // MSB
 	frame[5] = packet->data & 0xFF; // LSB
@@ -165,9 +159,19 @@ void constructPacket()
 	if (packet->id == 0)
 			processSuccess();
 }
+void construct_F5(void)
+{
+	uint16_t regAddr= packet->local_start_address / 16;
+	uint8_t bitAddr =packet->local_start_address % 16 ;
+	if (bitAddr>0){
+		regAddr ++;
+	}
+	packet->data = (bitRead(register_array[regAddr],bitAddr)?COIL_ON:COIL_OFF);
+}
 
 unsigned char construct_F15()
 {
+	//todo.....
 	// function 15 coil information is packed LSB first until the first 16 bits are completed
   // It is received the same way..
   unsigned char no_of_registers = packet->data / 16;
@@ -339,7 +343,9 @@ void process_F1_F2()
 {
 	// packet->data for function 1 & 2 is actually the number of boolean points
   unsigned char no_of_registers = packet->data / 16;
-  unsigned char number_of_bytes = no_of_registers * 2;
+  unsigned char number_of_bytes = packet->data / 8;
+	//unsigned char byteEndBit = packet->data % 8;
+	unsigned char registerEndBit = packet->data % 16;
 	unsigned int RegisterAddress = (packet->local_start_address /16);
 	unsigned char RegisterStartBit = packet->local_start_address % 16;
   // if the number of points dont fit in even 2byte amounts (one register) then use another register and pad
@@ -356,32 +362,52 @@ void process_F1_F2()
     unsigned char bytes_processed = 0;
     unsigned char index = 3; // start at the 4th element in the frame and combine the Lo byte
     unsigned int temp;
+
     for (unsigned char i = 0; i < no_of_registers; i++)
     {
       temp = frame[index];
-      bytes_processed++;
-      if (bytes_processed +2 < number_of_bytes)
+      if (bytes_processed +2 < number_of_bytes) //非最后一个register
       {
 				temp = (frame[index + 1] << 8) | temp;
-        bytes_processed++;
+        bytes_processed+=2;
         index += 2;
-      }
-			if (RegisterStartBit > 0)
-			{
-      	register_array[RegisterAddress+i] = (register_array[RegisterAddress+i] & ((1U<<RegisterStartBit)-1)) \
-																						| (temp << RegisterStartBit);
-				register_array[RegisterAddress+i+1] = (register_array[RegisterAddress+i+1] & ~((1U<<RegisterStartBit)-1)) \
-																						| (temp >> RegisterStartBit);
+				if (RegisterStartBit > 0)
+				{
+	      	register_array[RegisterAddress+i] = (register_array[RegisterAddress+i] & ((1U<<RegisterStartBit)-1)) \
+																							| (temp << RegisterStartBit);
+					register_array[RegisterAddress+i+1] = (register_array[RegisterAddress+i+1] & ~((1U<<RegisterStartBit)-1)) \
+																							| (temp >> RegisterStartBit);
+				}
+				else
+				{
+					register_array[RegisterAddress+i] = temp;
+				}
+    	}else{  //最后一个register
+				if((bytes_processed+1)< number_of_bytes){ //还剩下2个byte
+					temp = (frame[index + 1] << 8) | temp;
+					//endBitOfByte += 8;
+				}else{}
+				if (RegisterStartBit > 0)
+				{
+					if((RegisterStartBit + registerEndBit) >16){
+						register_array[RegisterAddress+i] = (register_array[RegisterAddress+i] & ((1U<<RegisterStartBit)-1)) \
+																								| (temp << RegisterStartBit);
+						register_array[RegisterAddress+i+1] = (temp >> RegisterStartBit)  \
+												| (register_array[RegisterAddress+i+1] | (~((1U<<(RegisterStartBit + registerEndBit -16))-1)));
+					}else{
+						register_array[RegisterAddress+i] = (temp << RegisterStartBit) | (register_array[RegisterAddress+i] \
+												& (((1U<<RegisterStartBit)-1) | (~((1U<<(RegisterStartBit + registerEndBit))-1))));
+					}
+				}else{
+					register_array[RegisterAddress+i] = temp | (register_array[RegisterAddress+i] & (~(1U<<registerEndBit)-1));
+				}
 			}
-			else
-			{
-				register_array[RegisterAddress+i] = temp;
-			}
-    }
+	  }//for
     processSuccess();
-  }
-  else // incorrect number of bytes returned
+  }  else {// incorrect number of bytes returned
+		packet->exceptionCode = 0x04;
     processError();
+	}
 }
 
 void process_F3_F4()
