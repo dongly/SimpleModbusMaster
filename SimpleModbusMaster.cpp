@@ -163,9 +163,6 @@ void construct_F5(void)
 {
 	uint16_t regAddr= packet->local_start_address / 16;
 	uint8_t bitAddr =packet->local_start_address % 16 ;
-	if (bitAddr>0){
-		regAddr ++;
-	}
 	packet->data = (bitRead(register_array[regAddr],bitAddr)?COIL_ON:COIL_OFF);
 }
 
@@ -366,11 +363,12 @@ void process_F1_F2()
     for (unsigned char i = 0; i < no_of_registers; i++)
     {
       temp = frame[index];
-      if (bytes_processed +2 < number_of_bytes) //非最后一个register
+	    if (bytes_processed +2 < number_of_bytes) //非最后一个register
       {
 				temp = (frame[index + 1] << 8) | temp;
         bytes_processed+=2;
         index += 2;
+				register_array[RegisterAddress+i]= temp;
 				if (RegisterStartBit > 0)
 				{
 	      	register_array[RegisterAddress+i] = (register_array[RegisterAddress+i] & ((1U<<RegisterStartBit)-1)) \
@@ -401,6 +399,7 @@ void process_F1_F2()
 				}else{
 					register_array[RegisterAddress+i] = temp | (register_array[RegisterAddress+i] & (~(1U<<registerEndBit)-1));
 				}
+
 			}
 	  }//for
     processSuccess();

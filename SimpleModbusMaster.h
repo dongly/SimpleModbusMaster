@@ -96,8 +96,8 @@
 typedef struct
 {
   // specific packet info
-  unsigned char id;
   unsigned char function;
+  unsigned char id;
   unsigned int address;
 
 	// For functions 1 & 2 data is the number of points
