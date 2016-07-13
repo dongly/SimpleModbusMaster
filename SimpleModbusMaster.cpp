@@ -511,7 +511,7 @@ void modbus_configure(HardwareSerial* SerialPort,
 	total_no_of_packets = _total_no_of_packets;
 	packetArray = _packets;
 	register_array = _register_array;
-	isFinished =false;
+	isFinished =true;
 
 	ModbusPort = SerialPort;
 	(*ModbusPort).begin(baud, byteFormat);
