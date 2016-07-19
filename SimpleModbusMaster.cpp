@@ -3,10 +3,10 @@
 
 // SimpleModbusMasterV2rev2
 
-// state machine states
-#define IDLE 1
-#define WAITING_FOR_REPLY 2
-#define WAITING_FOR_TURNAROUND 3
+// // state machine states
+// #define IDLE 1
+// #define WAITING_FOR_REPLY 2
+// #define WAITING_FOR_TURNAROUND 3
 
 #define BUFFER_SIZE 64
 
@@ -34,6 +34,7 @@ HardwareSerial* ModbusPort;
 unsigned char PacketsChanged;
 unsigned int packet_index;
 bool isFinished;
+bool isStop;
 
 // function definitions
 void idle();
@@ -52,23 +53,33 @@ void processSuccess();
 unsigned int calculateCRC(unsigned char bufferSize);
 void sendPacket(unsigned char bufferSize);
 void updatePackets(void);
+
+
 // Modbus Master State Machine
 void modbus_update()
 {
 	switch (state)
 	{
+		// case MBSTOP:
+		// 	break;
 		case IDLE:
-		if(PacketsChanged){
-			updatePackets();
-		}
-		idle();
-		break;
+			// if(!isStop){
+				if(PacketsChanged){
+					updatePackets();
+				}
+				idle();
+			// }else{
+			// 	state = MBSTOP;
+			// }
+			break;
 		case WAITING_FOR_REPLY:
-		waiting_for_reply();
-		break;
+			waiting_for_reply();
+			break;
 		case WAITING_FOR_TURNAROUND:
-		waiting_for_turnaround();
-		break;
+			waiting_for_turnaround();
+			break;
+		default:
+			;
 	}
 }
 
@@ -512,6 +523,7 @@ void modbus_configure(HardwareSerial* SerialPort,
 	packetArray = _packets;
 	register_array = _register_array;
 	isFinished =true;
+	isStop = false;
 
 	ModbusPort = SerialPort;
 	(*ModbusPort).begin(baud, byteFormat);
@@ -600,4 +612,14 @@ void updatePackets(void)
 bool modbus_isFinished(void )
 {
 	return isFinished;
+}
+
+void modbus_stop(void)
+{
+	isStop = true;
+}
+
+void modbus_start(void)
+{
+	isStop = false;
 }

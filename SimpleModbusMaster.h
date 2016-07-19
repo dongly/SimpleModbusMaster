@@ -93,6 +93,12 @@
 #define FORCE_MULTIPLE_COILS 15 // Forces each coil (0X reference) in a sequence of coils to either ON or OFF.
 #define PRESET_MULTIPLE_REGISTERS 16 // Presets values into a sequence of holding registers (4X references).
 
+// state machine states
+#define MBSTOP 0
+#define IDLE 1
+#define WAITING_FOR_REPLY 2
+#define WAITING_FOR_TURNAROUND 3
+
 typedef struct
 {
   // specific packet info
@@ -146,4 +152,7 @@ unsigned char modbus_getstate(void);
 
 void modbus_updatePackets(Packet* _packets,unsigned int _total_no_of_packets);
 bool modbus_isFinished(void );
+bool modbus_isIdle(void);
+void modbus_stop(void);
+void modbus_start(void);
 #endif
