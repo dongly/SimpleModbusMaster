@@ -1,5 +1,6 @@
 #include "SimpleModbusMaster.h"
 #include "HardwareSerial.h"
+#include "fifoarray.h"
 
 // SimpleModbusMasterV2rev2
 
@@ -9,7 +10,8 @@
 // #define WAITING_FOR_TURNAROUND 3
 
 #define BUFFER_SIZE 64
-
+#define PAKET_NORM_LIST_SIZE 32;
+#define PAKET_PRIOR_LIST_SIZE 32;
 unsigned char state;
 unsigned char retry_count;
 unsigned char TxEnablePin;
@@ -29,6 +31,7 @@ unsigned int temp_total_no_of_packets;
 Packet* packetArray; // packet starting address
 Packet* tempPacketArray;
 Packet* packet; // current packet
+Packet* paketPrior; //prior packet
 unsigned int* register_array; // pointer to masters register array
 HardwareSerial* ModbusPort;
 unsigned char PacketsChanged;
@@ -60,17 +63,21 @@ void modbus_update()
 {
 	switch (state)
 	{
-		// case MBSTOP:
-		// 	break;
+		case MBSTOP:
+			if(!isStop){
+				state =IDLE;
+			}
+			break;
 		case IDLE:
-			// if(!isStop){
-				if(PacketsChanged){
-					updatePackets();
-				}
-				idle();
-			// }else{
-			// 	state = MBSTOP;
-			// }
+			if(isStop ){
+				state = MBSTOP;
+				break;
+			}
+
+			if(PacketsChanged){
+				updatePackets();
+			}
+			idle();
 			break;
 		case WAITING_FOR_REPLY:
 			waiting_for_reply();
