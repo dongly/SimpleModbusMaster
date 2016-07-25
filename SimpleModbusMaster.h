@@ -137,22 +137,24 @@ void modbus_construct(Packet *_packet,
 											unsigned int data,
 											unsigned int _local_start_address);
 
-void modbus_configure(HardwareSerial* SerialPort,
-											long baud,
-											unsigned char byteFormat,
-											unsigned long _timeout,
-											unsigned long _polling,
-											unsigned char _retry_count,
-											unsigned char _TxEnablePin,
-											Packet* _packets,
-											unsigned int _total_no_of_packets,
-											unsigned int* _register_array);
+void modbus_configure(HardwareSerial* SerialPort, long baud,unsigned char byteFormat,unsigned long _timeout,unsigned long _polling,unsigned char _retry_count,unsigned char _TxEnablePin,unsigned int* _register_array);
 
 unsigned char modbus_getstate(void);
 
-void modbus_updatePackets(Packet* _packets,unsigned int _total_no_of_packets);
-bool modbus_isFinished(void );
-bool modbus_isIdle(void);
-void modbus_stop(void);
-void modbus_start(void);
+// void modbus_updatePackets(Packet* _packets,unsigned int _total_no_of_packets);
+// bool modbus_isFinished(void );
+// bool modbus_isIdle(void);
+// void modbus_stop(void);
+// void modbus_start(void);
+
+extern bool modbus_priorListIsEmpty(void);
+extern bool modbus_normListIsEmpty(void);
+extern bool modbus_priorListIsFull(void);
+extern bool modbus_normListIsFull(void);
+
+// extern Packet* modbus_normListPop();
+extern bool modbus_normListPush(Packet* pPacket);
+// extern Packet* modbus_priorListPop();
+extern bool modbus_priorListPush(Packet* pPacket);
+
 #endif
