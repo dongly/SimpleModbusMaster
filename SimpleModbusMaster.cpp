@@ -96,7 +96,7 @@ void modbus_update()
 
 void idle()
 {
-	unsigned int failed_connections = 0;
+	// unsigned int failed_connections = 0;
 
 	unsigned char current_connection;
 	// unsigned char i;
@@ -115,28 +115,26 @@ void idle()
 		// }
 		// proceed to the next packet
 		// packet = &packetArray[packet_index];
-		if(queuePrior.isEmpty()){
-			if(!queueNorm.isEmpty()){
-				// queueNorm.push(CODE_PACKET);
-				packet = queueNorm.pop();
-				packet->connection = 1;
-			}
-		}else{
+		if(!queuePrior.isEmpty()){
 			packet = queuePrior.pop();
 			packet->connection = 1;
+		}else	if(!queueNorm.isEmpty()){
+			// queueNorm.push(CODE_PACKET);
+			packet = queueNorm.pop();
+			packet->connection = 1;
+		}else{ //all queue is empty
+			return;
 		}
-
 		// get the current connection status
 		current_connection = packet->connection;
 
-		if (!current_connection)
-		{
-			//??
+		// if (!current_connection)
+		// {
 			// If all the connection attributes are false return
 			// immediately to the main sketch
 			// if (++failed_connections == total_no_of_packets)
 			// 	return;
-		}
+		// }
 		// packet_index++;
 
 	// if a packet has no connection get the next one
