@@ -394,7 +394,7 @@ void process_F1_F2()
     for (unsigned char i = 0; i < no_of_registers; i++)
     {
       temp = frame[index];
-	    if (bytes_processed +2 < number_of_bytes) //非最后一个register
+	    if (bytes_processed +2 < number_of_bytes) //not last register
       {
 				temp = (frame[index + 1] << 8) | temp;
         bytes_processed+=2;
@@ -402,16 +402,18 @@ void process_F1_F2()
 				register_array[RegisterAddress+i]= temp;
 				if (RegisterStartBit > 0)
 				{
-	      	register_array[RegisterAddress+i] = (register_array[RegisterAddress+i] & ((1U<<RegisterStartBit)-1)) \
+	      	register_array[RegisterAddress+i] = (register_array[RegisterAddress+i]
+																							& ((1U<<RegisterStartBit)-1))
 																							| (temp << RegisterStartBit);
-					register_array[RegisterAddress+i+1] = (register_array[RegisterAddress+i+1] & ~((1U<<RegisterStartBit)-1)) \
+					register_array[RegisterAddress+i+1] = (register_array[RegisterAddress+i+1]
+																							& ~((1U<<RegisterStartBit)-1))
 																							| (temp >> RegisterStartBit);
 				}
 				else
 				{
 					register_array[RegisterAddress+i] = temp;
 				}
-    	}else{  //最后一个register
+    	}else{  //last register
 				if((bytes_processed+1)< number_of_bytes){ //还剩下2个byte
 					temp = (frame[index + 1] << 8) | temp;
 					//endBitOfByte += 8;
@@ -419,13 +421,17 @@ void process_F1_F2()
 				if (RegisterStartBit > 0)
 				{
 					if((RegisterStartBit + registerEndBit) >16){
-						register_array[RegisterAddress+i] = (register_array[RegisterAddress+i] & ((1U<<RegisterStartBit)-1)) \
+						register_array[RegisterAddress+i] = (register_array[RegisterAddress+i]
+																								& ((1U<<RegisterStartBit)-1))
 																								| (temp << RegisterStartBit);
-						register_array[RegisterAddress+i+1] = (temp >> RegisterStartBit)  \
-												| (register_array[RegisterAddress+i+1] | (~((1U<<(RegisterStartBit + registerEndBit -16))-1)));
+						register_array[RegisterAddress+i+1] = (temp >> RegisterStartBit)
+																									| (register_array[RegisterAddress+i+1]
+																									| (~((1U<<(RegisterStartBit + registerEndBit -16))-1)));
 					}else{
-						register_array[RegisterAddress+i] = (temp << RegisterStartBit) | (register_array[RegisterAddress+i] \
-												& (((1U<<RegisterStartBit)-1) | (~((1U<<(RegisterStartBit + registerEndBit))-1))));
+						register_array[RegisterAddress+i] = (temp << RegisterStartBit)
+																								| (register_array[RegisterAddress+i]
+																								& (((1U<<RegisterStartBit)-1)
+																								| (~((1U<<(RegisterStartBit + registerEndBit))-1))));
 					}
 				}else{
 					register_array[RegisterAddress+i] = temp | (register_array[RegisterAddress+i] & (~(1U<<registerEndBit)-1));
