@@ -4,11 +4,6 @@
 
 // SimpleModbusMasterV2rev2
 
-// // state machine states
-// #define IDLE 1
-// #define WAITING_FOR_REPLY 2
-// #define WAITING_FOR_TURNAROUND 3
-
 #define BUFFER_SIZE 64
 #define PAKET_NORM_LIST_SIZE 32
 #define PAKET_PRIOR_LIST_SIZE 32
@@ -27,10 +22,6 @@ unsigned long polling; // turnaround delay interval
 unsigned int T1_5; // inter character time out in microseconds
 unsigned int frameDelay; // frame time out in microseconds
 long delayStart; // init variable for turnaround and timeout delay
-// unsigned int total_no_of_packets;
-// unsigned int temp_total_no_of_packets;
-// Packet* packetArray; // packet starting address
-// Packet* tempPacketArray;
 Packet* packet; // current packet
 Packet* packetPriorList[PAKET_PRIOR_LIST_SIZE]; //prior packet list
 Packet* packetNormList[PAKET_NORM_LIST_SIZE]; //Norm packet list
@@ -67,20 +58,7 @@ void modbus_update()
 {
 	switch (state)
 	{
-		// case MBSTOP:
-		// 	if(!isStop){
-		// 		state =IDLE;
-		// 	}
-		// 	break;
 		case IDLE:
-			// if(isStop ){
-			// 	state = MBSTOP;
-			// 	break;
-			// }
-
-			// if(PacketsChanged){
-			// 	updatePackets();
-			// }
 			idle();
 			break;
 		case WAITING_FOR_REPLY:
@@ -96,30 +74,14 @@ void modbus_update()
 
 void idle()
 {
-	// unsigned int failed_connections = 0;
-
 	unsigned char current_connection;
-	// unsigned char i;
+
 	do
 	{
-		// if (packet_index >= total_no_of_packets) // wrap around to the beginning
-		// {
-		// 	packet_index = 0;
-		// 	isFinished =true;
-		// 	return;
-		// }
-		// if (packet_index == 0){
-		// 	for(i=0;i<total_no_of_packets;i++){
-		// 		packetArray[i].connection = 1;
-		// 	}
-		// }
-		// proceed to the next packet
-		// packet = &packetArray[packet_index];
 		if(!queuePrior.isEmpty()){
 			packet = queuePrior.pop();
 			packet->connection = 1;
 		}else	if(!queueNorm.isEmpty()){
-			// queueNorm.push(CODE_PACKET);
 			packet = queueNorm.pop();
 			packet->connection = 1;
 		}else{ //all queue is empty
@@ -544,11 +506,7 @@ void modbus_configure(HardwareSerial* SerialPort,
   polling = _polling;
 	retry_count = _retry_count;
 	TxEnablePin = _TxEnablePin;
-	// total_no_of_packets = _total_no_of_packets;
-	// packetArray = _packets;
 	register_array = _register_array;
-	// isFinished =true;
-	// isStop = false;
 
 	ModbusPort = SerialPort;
 	(*ModbusPort).begin(baud, byteFormat);
@@ -618,36 +576,6 @@ unsigned char modbus_getstate(void)
 	return state;
 }
 
-// void modbus_updatePackets(Packet* _packets,unsigned int _total_no_of_packets)
-// {
-// 	temp_total_no_of_packets = _total_no_of_packets;
-// 	tempPacketArray = _packets;
-// 	PacketsChanged = 1;
-// }
-//
-// void updatePackets(void)
-// {
-// 	packetArray = tempPacketArray;
-// 	total_no_of_packets = temp_total_no_of_packets;
-// 	packet_index = 0;
-// 	PacketsChanged = 0;
-// 	isFinished =false;
-// }
-//
-// bool modbus_isFinished(void )
-// {
-// 	return isFinished;
-// }
-//
-// void modbus_stop(void)
-// {
-// 	isStop = true;
-// }
-//
-// void modbus_start(void)
-// {
-// 	isStop = false;
-// }
 
 bool modbus_priorListIsEmpty(void)
 {
@@ -669,20 +597,10 @@ bool modbus_normListIsFull(void)
 	return queueNorm.isFull();
 }
 
-// Packet* modbus_normListPop()
-// {
-// 	return queueNorm.pop();
-// }
-
 bool modbus_normListPush(Packet* pPacket)
 {
 	return queueNorm.push(pPacket);
 }
-
-// Packet* modbus_priorListPop()
-// {
-// 	return queuePrior.pop();
-// }
 
 bool modbus_priorListPush(Packet* pPacket)
 {
