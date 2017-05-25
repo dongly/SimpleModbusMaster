@@ -1,6 +1,6 @@
 #include "SimpleModbusMaster.h"
 #include "HardwareSerial.h"
-#include "fifoarray.h"
+//#include "fifoarray.h"
 
 // SimpleModbusMasterV2rev2
 
@@ -15,6 +15,8 @@
 unsigned char state;
 unsigned char retry_count;
 unsigned char TxEnablePin;
+unsigned char TxLedPin;
+unsigned char RxLedPin;
 
 // frame[] is used to receive and transmit packages.
 // The maximum number of bytes in a modbus packet is 256 bytes
@@ -28,7 +30,7 @@ unsigned int frameDelay; // frame time out in microseconds
 long delayStart; // init variable for turnaround and timeout delay
 unsigned int total_no_of_packets;
 unsigned int temp_total_no_of_packets;
-Packet* packetArray; // packet starting address
+//Packet* packetArray; // packet starting address
 Packet* tempPacketArray;
 Packet* packet; // current packet
 Packet* paketPrior; //prior packet
@@ -37,7 +39,8 @@ HardwareSerial* ModbusPort;
 unsigned char PacketsChanged;
 unsigned int packet_index;
 bool isFinished;
-bool isStop;
+bool isSuccess;
+//bool isStop;
 
 // function definitions
 void idle();
@@ -55,7 +58,12 @@ void processError();
 void processSuccess();
 unsigned int calculateCRC(unsigned char bufferSize);
 void sendPacket(unsigned char bufferSize);
-void updatePackets(void);
+//void updatePackets(void);
+unsigned char updatePacket(	unsigned char id,
+														unsigned char function,
+														unsigned int address,
+														unsigned int data,
+														unsigned int local_start_address);
 
 
 // Modbus Master State Machine
@@ -63,20 +71,7 @@ void modbus_update()
 {
 	switch (state)
 	{
-		case MBSTOP:
-			if(!isStop){
-				state =IDLE;
-			}
-			break;
 		case IDLE:
-			if(isStop ){
-				state = MBSTOP;
-				break;
-			}
-
-			if(PacketsChanged){
-				updatePackets();
-			}
 			idle();
 			break;
 		case WAITING_FOR_REPLY:
@@ -92,6 +87,7 @@ void modbus_update()
 
 void idle()
 {
+	#if 0
 	unsigned int failed_connections = 0;
 
 	unsigned char current_connection;
@@ -126,8 +122,11 @@ void idle()
 
 	// if a packet has no connection get the next one
 	}while (!current_connection);
+#endif //0
 
-	constructPacket();
+	if (packet->connection){
+		constructPacket();
+	}
 }
 
 void constructPacket()
@@ -177,6 +176,7 @@ void constructPacket()
 	if (packet->id == 0)
 			processSuccess();
 }
+
 void construct_F5(void)
 {
 	uint16_t regAddr= packet->local_start_address / 16;
@@ -260,6 +260,7 @@ void waiting_for_reply()
 		buffer = 0;
 		while ((*ModbusPort).available())
 		{
+			digitalWrite(RxLedPin, MB_LED_ON);
 			// The maximum number of bytes is limited to the serial buffer size
       // of BUFFER_SIZE. If more bytes is received than the BUFFER_SIZE the
       // overflow flag will be set and the serial buffer will be read until
@@ -281,6 +282,8 @@ void waiting_for_reply()
 			// If there are more bytes after such a delay it is not supposed to
 			// be received and thus will force a frame_error.
 			delayMicroseconds(T1_5); // inter character time out
+
+			digitalWrite(RxLedPin, MB_LED_OFF);
 		}
 
 		// The minimum buffer size from a slave can be an exception response of
@@ -467,10 +470,12 @@ void processError()
 
 	// if the number of retries have reached the max number of retries
   // allowable, stop requesting the specific packet
-  if (packet->retries == retry_count)
+  if (packet->retries >= retry_count)
 	{
     packet->connection = 0;
 		packet->retries = 0;
+		isSuccess = false;
+		isFinished = true;
 	}
 	state = WAITING_FOR_TURNAROUND;
 	delayStart = millis(); // start the turnaround delay
@@ -481,7 +486,10 @@ void processSuccess()
 	packet->successful_requests++; // transaction sent successfully
 	packet->retries = 0; // if a request was successful reset the retry counter
 	state = WAITING_FOR_TURNAROUND;
-	delayStart = millis(); // start the turnaround delay
+	packet->connection = 0;
+	isSuccess = true;
+	isFinished = true;
+	delayStart = millis(); // start the  turnaround delay
 }
 
 void modbus_configure(HardwareSerial* SerialPort,
@@ -491,8 +499,10 @@ void modbus_configure(HardwareSerial* SerialPort,
 											unsigned long _polling,
 											unsigned char _retry_count,
 											unsigned char _TxEnablePin,
+											unsigned char _TxLedPin,
+											unsigned char _RxLedPin,
 											Packet* _packets,
-											unsigned int _total_no_of_packets,
+											//unsigned int _total_no_of_packets,
 											unsigned int* _register_array)
 {
 	// Modbus states that a baud rate higher than 19200 must use a fixed 750 us
@@ -526,20 +536,27 @@ void modbus_configure(HardwareSerial* SerialPort,
   polling = _polling;
 	retry_count = _retry_count;
 	TxEnablePin = _TxEnablePin;
-	total_no_of_packets = _total_no_of_packets;
-	packetArray = _packets;
+	TxLedPin = _TxLedPin;
+	RxLedPin = _RxLedPin;
+	//total_no_of_packets = _total_no_of_packets;
+	packet = _packets;
 	register_array = _register_array;
 	isFinished =true;
-	isStop = false;
+	isSuccess = false;
+	//isStop = false;
 
 	ModbusPort = SerialPort;
 	(*ModbusPort).begin(baud, byteFormat);
 
 	pinMode(TxEnablePin, OUTPUT);
+	pinMode(TxLedPin, OUTPUT);
+	pinMode(RxLedPin, OUTPUT);
   digitalWrite(TxEnablePin, LOW);
+  digitalWrite(TxLedPin, MB_LED_OFF);
+  digitalWrite(RxLedPin, MB_LED_OFF);
 
 }
-
+#if 0
 void modbus_construct(Packet *_packet,
 											unsigned char id,
 											unsigned char function,
@@ -554,6 +571,7 @@ void modbus_construct(Packet *_packet,
 	_packet->local_start_address = local_start_address;
 	_packet->connection = 1;
 }
+#endif  //0
 
 unsigned int calculateCRC(unsigned char bufferSize)
 {
@@ -582,6 +600,7 @@ unsigned int calculateCRC(unsigned char bufferSize)
 void sendPacket(unsigned char bufferSize)
 {
 	digitalWrite(TxEnablePin, HIGH);
+	digitalWrite(TxLedPin, MB_LED_ON);
 
 	for (unsigned char i = 0; i < bufferSize; i++)
 		(*ModbusPort).write(frame[i]);
@@ -591,6 +610,7 @@ void sendPacket(unsigned char bufferSize)
 	delayMicroseconds(frameDelay);
 
 	digitalWrite(TxEnablePin, LOW);
+	digitalWrite(TxLedPin, MB_LED_OFF);
 
 	delayStart = millis(); // start the timeout delay
 }
@@ -607,6 +627,7 @@ void modbus_updatePackets(Packet* _packets,unsigned int _total_no_of_packets)
 	PacketsChanged = 1;
 }
 
+#if 0
 void updatePackets(void)
 {
 	packetArray = tempPacketArray;
@@ -615,12 +636,13 @@ void updatePackets(void)
 	PacketsChanged = 0;
 	isFinished =false;
 }
+#endif //0
 
 bool modbus_isFinished(void )
 {
 	return isFinished;
 }
-
+#if 0
 void modbus_stop(void)
 {
 	isStop = true;
@@ -629,4 +651,108 @@ void modbus_stop(void)
 void modbus_start(void)
 {
 	isStop = false;
+}
+#endif //0
+
+//Set packet 
+unsigned char updatePacket(	unsigned char id,
+														unsigned char function,
+														unsigned int address,
+														unsigned int data,
+														unsigned int local_start_address)
+{
+	if (!isFinished) {
+		return mbBusy;
+	}
+
+	packet->id = id;
+  packet->function = function;
+  packet->address = address;
+  packet->data = data;
+	packet->local_start_address = local_start_address;
+	packet->connection = 1;
+	isFinished =false;
+	isSuccess = false;
+	return mbSuccess;
+}								
+
+// READ_COIL_STATUS 1 // Reads the ON/OFF status of discrete outputs (0X references, coils) in the slave.
+unsigned char mbReadCoilStaus(unsigned char id,
+															unsigned int address,
+															unsigned int length,
+															unsigned int local_start_address)
+{
+	return updatePacket(id, READ_COIL_STATUS, address, length, local_start_address);
+}
+
+// READ_INPUT_STATUS 2 // Reads the ON/OFF status of discrete inputs (1X references) in the slave.
+unsigned char mbReadInputStatus(	unsigned char id,
+																	unsigned int address,
+																	unsigned int length,
+																	unsigned int local_start_address)
+{
+	return updatePacket(id, READ_INPUT_STATUS, address, length, local_start_address);
+}
+
+// READ_HOLDING_REGISTERS 3 // Reads the binary contents of holding registers (4X references) in the slave.
+unsigned char mbReadHoldingRegisters(	unsigned char id,
+																			unsigned int address,
+																			unsigned int length,
+																			unsigned int local_start_address)
+{
+	return updatePacket(id, READ_HOLDING_REGISTERS, address, length, local_start_address);
+}
+
+// READ_INPUT_REGISTERS 4 // Reads the binary contents of input registers (3X references) in the slave. Not writable.
+unsigned char mbReadInputRegisters(	unsigned char id,
+																		unsigned int address,
+																		unsigned int length,
+																		unsigned int local_start_address)
+{
+	return updatePacket(id, READ_INPUT_REGISTERS, address, length, local_start_address);
+}
+
+// FORCE_SINGLE_COIL 5 // Forces a single coil (0X reference) to either ON (0xFF00) or OFF (0x0000).
+unsigned char mbForceSingleCoil(	unsigned char id,
+																	unsigned int address,
+																	unsigned int local_start_address)
+{
+	return updatePacket(id, FORCE_SINGLE_COIL, address, 1, local_start_address);
+}
+
+// PRESET_SINGLE_REGISTER 6 // Presets a value into a single holding register (4X reference).
+unsigned char mbPresetSingleRegister(	unsigned char id,
+																			unsigned int address,
+																			unsigned int local_start_address)
+{
+	return updatePacket(id, READ_INPUT_STATUS, address, 1, local_start_address);
+}
+
+// FORCE_MULTIPLE_COILS 15 // Forces each coil (0X reference) in a sequence of coils to either ON or OFF.
+unsigned char mbForceMultipleCoils(	unsigned char id,
+																		unsigned int address,
+																		unsigned int length,
+																		unsigned int local_start_address)
+{
+	return updatePacket(id, FORCE_MULTIPLE_COILS, address, length, local_start_address);
+}
+
+// PRESET_MULTIPLE_REGISTERS 16 // Presets values into a sequence of holding registers (4X references).
+unsigned char mbPresetMultipleRegisters(	unsigned char id,
+																					unsigned int address,
+																					unsigned int length,
+																					unsigned int local_start_address)
+{
+	return updatePacket(id, PRESET_MULTIPLE_REGISTERS, address, length, local_start_address);
+}
+
+unsigned char modbus_result(void)
+{
+	if (!isFinished) {
+		return mbBusy;
+	} else if (isSuccess){
+		return mbSuccess;
+	} else {
+		return mbFail;
+	}
 }

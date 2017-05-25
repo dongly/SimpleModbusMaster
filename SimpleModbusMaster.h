@@ -94,10 +94,23 @@
 #define PRESET_MULTIPLE_REGISTERS 16 // Presets values into a sequence of holding registers (4X references).
 
 // state machine states
-#define MBSTOP 0
+//#define MBSTOP 0
 #define IDLE 1
 #define WAITING_FOR_REPLY 2
 #define WAITING_FOR_TURNAROUND 3
+
+#ifndef MB_LED_ON
+#define MB_LED_ON   LOW
+#endif
+#ifndef MB_LED_OFF
+#define MB_LED_OFF  HIGH
+#endif
+
+// return
+enum {mbSuccess = 0,
+      mbBusy    = 1,
+      mbFail    = 2
+};
 
 typedef struct
 {
@@ -130,12 +143,12 @@ typedef struct
 // function definitions
 void modbus_update();
 
-void modbus_construct(Packet *_packet,
-											unsigned char id,
-											unsigned char function,
-											unsigned int address,
-											unsigned int data,
-											unsigned int _local_start_address);
+//void modbus_construct(Packet *_packet,
+//											unsigned char id,
+//											unsigned char function,
+//											unsigned int address,
+//											unsigned int data,
+//											unsigned int _local_start_address);
 
 void modbus_configure(HardwareSerial* SerialPort,
 											long baud,
@@ -144,15 +157,64 @@ void modbus_configure(HardwareSerial* SerialPort,
 											unsigned long _polling,
 											unsigned char _retry_count,
 											unsigned char _TxEnablePin,
+											unsigned char _TxLedPin,
+											unsigned char _RxLedPin,
 											Packet* _packets,
-											unsigned int _total_no_of_packets,
+											//unsigned int _total_no_of_packets,
 											unsigned int* _register_array);
 
 unsigned char modbus_getstate(void);
 
-void modbus_updatePackets(Packet* _packets,unsigned int _total_no_of_packets);
+//void modbus_updatePackets(Packet* _packets,unsigned int _total_no_of_packets);
 bool modbus_isFinished(void );
 bool modbus_isIdle(void);
-void modbus_stop(void);
-void modbus_start(void);
+//void modbus_stop(void);
+//void modbus_start(void);
+bool modbus_isSuccess(void);
+
+// READ_COIL_STATUS 1 // Reads the ON/OFF status of discrete outputs (0X references, coils) in the slave.
+unsigned char mbReadCoilStaus(unsigned char id,
+															unsigned int address,
+															unsigned int length,
+															unsigned int local_start_address);
+
+// READ_INPUT_STATUS 2 // Reads the ON/OFF status of discrete inputs (1X references) in the slave.
+unsigned char mbReadInputStatus(	unsigned char id,
+																	unsigned int address,
+																	unsigned int length,
+																	unsigned int local_start_address);
+
+// READ_HOLDING_REGISTERS 3 // Reads the binary contents of holding registers (4X references) in the slave.
+unsigned char mbReadHoldingRegisters(	unsigned char id,
+																			unsigned int address,
+																			unsigned int length,
+																			unsigned int local_start_address);
+
+// READ_INPUT_REGISTERS 4 // Reads the binary contents of input registers (3X references) in the slave. Not writable.
+unsigned char mbReadInputRegisters(	unsigned char id,
+																		unsigned int address,
+																		unsigned int length,
+																		unsigned int local_start_address);
+
+// FORCE_SINGLE_COIL 5 // Forces a single coil (0X reference) to either ON (0xFF00) or OFF (0x0000).
+unsigned char mbForceSingleCoil(	unsigned char id,
+																	unsigned int address,
+																	unsigned int local_start_address);
+
+// PRESET_SINGLE_REGISTER 6 // Presets a value into a single holding register (4X reference).
+unsigned char mbPresetSingleRegister(	unsigned char id,
+																			unsigned int address,
+																			unsigned int local_start_address);
+
+// FORCE_MULTIPLE_COILS 15 // Forces each coil (0X reference) in a sequence of coils to either ON or OFF.
+unsigned char mbForceMultipleCoils(	unsigned char id,
+																		unsigned int address,
+																		unsigned int length,
+																		unsigned int local_start_address);
+
+// PRESET_MULTIPLE_REGISTERS 16 // Presets values into a sequence of holding registers (4X references).
+unsigned char mbPresetMultipleRegisters(	unsigned char id,
+																					unsigned int address,
+																					unsigned int length,
+																					unsigned int local_start_address);
 #endif
