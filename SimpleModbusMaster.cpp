@@ -59,12 +59,6 @@ void processSuccess();
 unsigned int calculateCRC(unsigned char bufferSize);
 void sendPacket(unsigned char bufferSize);
 //void updatePackets(void);
-unsigned char updatePacket(	unsigned char id,
-														unsigned char function,
-														unsigned int address,
-														unsigned int data,
-														unsigned int local_start_address);
-
 
 // Modbus Master State Machine
 void modbus_update()
@@ -655,11 +649,11 @@ void modbus_start(void)
 #endif //0
 
 //Set packet 
-unsigned char updatePacket(	unsigned char id,
-														unsigned char function,
-														unsigned int address,
-														unsigned int data,
-														unsigned int local_start_address)
+unsigned char modbus_updatePacket(	unsigned char id,
+																		unsigned char function,
+																		unsigned int address,
+																		unsigned int data,
+																		unsigned int local_start_address)
 {
 	if (!isFinished) {
 		return mbBusy;
@@ -682,7 +676,7 @@ unsigned char mbReadCoilStaus(unsigned char id,
 															unsigned int length,
 															unsigned int local_start_address)
 {
-	return updatePacket(id, READ_COIL_STATUS, address, length, local_start_address);
+	return modbus_updatePacket(id, READ_COIL_STATUS, address, length, local_start_address);
 }
 
 // READ_INPUT_STATUS 2 // Reads the ON/OFF status of discrete inputs (1X references) in the slave.
@@ -691,7 +685,7 @@ unsigned char mbReadInputStatus(	unsigned char id,
 																	unsigned int length,
 																	unsigned int local_start_address)
 {
-	return updatePacket(id, READ_INPUT_STATUS, address, length, local_start_address);
+	return modbus_updatePacket(id, READ_INPUT_STATUS, address, length, local_start_address);
 }
 
 // READ_HOLDING_REGISTERS 3 // Reads the binary contents of holding registers (4X references) in the slave.
@@ -700,7 +694,7 @@ unsigned char mbReadHoldingRegisters(	unsigned char id,
 																			unsigned int length,
 																			unsigned int local_start_address)
 {
-	return updatePacket(id, READ_HOLDING_REGISTERS, address, length, local_start_address);
+	return modbus_updatePacket(id, READ_HOLDING_REGISTERS, address, length, local_start_address);
 }
 
 // READ_INPUT_REGISTERS 4 // Reads the binary contents of input registers (3X references) in the slave. Not writable.
@@ -709,7 +703,7 @@ unsigned char mbReadInputRegisters(	unsigned char id,
 																		unsigned int length,
 																		unsigned int local_start_address)
 {
-	return updatePacket(id, READ_INPUT_REGISTERS, address, length, local_start_address);
+	return modbus_updatePacket(id, READ_INPUT_REGISTERS, address, length, local_start_address);
 }
 
 // FORCE_SINGLE_COIL 5 // Forces a single coil (0X reference) to either ON (0xFF00) or OFF (0x0000).
@@ -717,7 +711,7 @@ unsigned char mbForceSingleCoil(	unsigned char id,
 																	unsigned int address,
 																	unsigned int local_start_address)
 {
-	return updatePacket(id, FORCE_SINGLE_COIL, address, 1, local_start_address);
+	return modbus_updatePacket(id, FORCE_SINGLE_COIL, address, 1, local_start_address);
 }
 
 // PRESET_SINGLE_REGISTER 6 // Presets a value into a single holding register (4X reference).
@@ -725,7 +719,7 @@ unsigned char mbPresetSingleRegister(	unsigned char id,
 																			unsigned int address,
 																			unsigned int local_start_address)
 {
-	return updatePacket(id, READ_INPUT_STATUS, address, 1, local_start_address);
+	return modbus_updatePacket(id, READ_INPUT_STATUS, address, 1, local_start_address);
 }
 
 // FORCE_MULTIPLE_COILS 15 // Forces each coil (0X reference) in a sequence of coils to either ON or OFF.
@@ -734,7 +728,7 @@ unsigned char mbForceMultipleCoils(	unsigned char id,
 																		unsigned int length,
 																		unsigned int local_start_address)
 {
-	return updatePacket(id, FORCE_MULTIPLE_COILS, address, length, local_start_address);
+	return modbus_updatePacket(id, FORCE_MULTIPLE_COILS, address, length, local_start_address);
 }
 
 // PRESET_MULTIPLE_REGISTERS 16 // Presets values into a sequence of holding registers (4X references).
@@ -743,7 +737,7 @@ unsigned char mbPresetMultipleRegisters(	unsigned char id,
 																					unsigned int length,
 																					unsigned int local_start_address)
 {
-	return updatePacket(id, PRESET_MULTIPLE_REGISTERS, address, length, local_start_address);
+	return modbus_updatePacket(id, PRESET_MULTIPLE_REGISTERS, address, length, local_start_address);
 }
 
 unsigned char modbus_result(void)

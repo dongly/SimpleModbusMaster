@@ -170,7 +170,13 @@ bool modbus_isFinished(void );
 bool modbus_isIdle(void);
 //void modbus_stop(void);
 //void modbus_start(void);
-bool modbus_isSuccess(void);
+unsigned char modbus_result(void);
+
+unsigned char modbus_updatePacket(	unsigned char id,
+                                    unsigned char function,
+                                    unsigned int address,
+                                    unsigned int data,
+                                    unsigned int local_start_address);
 
 // READ_COIL_STATUS 1 // Reads the ON/OFF status of discrete outputs (0X references, coils) in the slave.
 unsigned char mbReadCoilStaus(unsigned char id,
